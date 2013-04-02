@@ -1,18 +1,17 @@
 # Mac
 .DS_Store
 
-# Object files
+# C files
 *.o
+*.c~
+*.elf
+*.hex
+Makefile~
+
 
 # Libraries
 *.lib
 *.a
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
 
 # Executables
 *.exe
