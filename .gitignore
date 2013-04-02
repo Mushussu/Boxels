@@ -18,3 +18,9 @@
 *.exe
 *.out
 *.app
+
+# Openscad
+*.stl
+*.gcode
+*.dxf
+*.bak
