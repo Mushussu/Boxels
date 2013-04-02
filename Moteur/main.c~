@@ -1,0 +1,78 @@
+#include <avr/io.h>
+#include <inttypes.h>
+#include <avr/interrupt.h>
+
+#define FOSC 16000000							// Fréquence de l'oscillateur en Hz
+#define BAUD 250000
+#define adresse_objet		18					// Adresse de test
+#define nbre_canaux_DMX    	1					// Nombre de canaux pour manipuler l'objet
+
+volatile uint8_t	 val_DMX; 					// Valeur DMX du canal
+volatile uint16_t	 compteur_DMX;					// Compteur de trame DMX
+
+ISR(USART_RX_vect) { 					// Routine d'intarryption de l'USART 0
+	uint8_t status, data;
+	status=UCSR0A;
+	data=UDR0;
+
+	if(status&0x10){compteur_DMX=0;UCSR0A &= ~(1<<FE0);return;} // Frame Error
+
+	if(compteur_DMX==adresse_objet){val_DMX=data;};
+	compteur_DMX++;
+}
+
+void init_uart(void) {
+	/* La configuration de PD5 permet de rendre possible la transmission des données série (Voir la datasheet du max485) */
+	DDRD |= (1<<5);					// Met le port PD5 en sortie
+	PORTD &= ~(1<<5);				// Met le port PD5 en l'état bas
+	// Transmission speed 9600 bps (bits per second)
+	// UBRR = FOSC/(16*BAUD)-1 (USART Baud Rate Register)
+	UBRR0H = (((FOSC/16)/BAUD-1)>>8);  // The high byte, UBRR0H
+	UBRR0L = ((FOSC/16)/BAUD-1);       // The low byte, UBRR0L
+   
+	//USART Control and Status Register B   UCSRB
+	/*
+	Bit 7   RXCIE0: RX Complete Interrupt Enable         			0
+	Bit 6   TXCIE0: TX Complete Interrupt Enable         			0
+	Bit 5   UDRIE0: USART Data Register Empty Interrupt Enable   	0
+	Bit 4   RXEN0: Receiver Enable          						0
+	Bit 3   TXEN0: Transmitter Enable    							0   
+	Bit 2   UCSZ02: Character Size           						0
+	Bit 1   RXB80: Receive Data Bit 8        						0
+	Bit 0   TXB80: Transmit Data Bit 8       						0
+	*/
+	// Enable the receiver and the transmitter and the interrupt
+	// UCSR0B = UCSR0B | (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);
+	UCSR0B = 0b10010000;
+   
+	/*USART Control and Status Register C   UCSRC
+	Bit 7   UMSEL01: 							0
+	Bit 6   UMSEL00: USART Mode Select   		0
+	Bit 5   UPM01       					0
+	Bit 4   UPM00: Parity Mode      		0
+	Bit 3   USBS0: Stop Bit Select      		1       2 stop bits
+	Bit 2   UCSZ01 : Character Size      	1		8 data bits
+	Bit 1   UCSZ00 : Character Size				1
+	Bit 0   UCPOL: Clock Polarity      		0
+	*/
+	// Frame format (8 data bits, 2 stop bit, no parity)
+	// UCSR0C = UCSR0C | (1<<UCSZ01) | (1<<UCSZ00) | (1<<USBS0);
+	UCSR0C = 0b00001110;
+	
+	return;
+}
+
+int main(void) {
+   init_uart();         // Initialize USART0
+   DDRD |= (1<<PD6);	      // PORT B (the leds) as output   
+   sei();               // Enable interrupts globally
+
+   while(1) {
+	   if (val_DMX >= 127) {				//enable LED if 1st DMX val is >127
+			PORTD &= ~(1<<PD6);					//LED ON
+		} else {
+			PORTD |= (1<<PD6);					//LED OFF
+		}
+   }
+}
+
